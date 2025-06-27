@@ -29,6 +29,8 @@ $app->withFacades();
 $app->configure('mail');
 $app->configure('cors');
 $app->configure('broadcasting');
+$app->configure('logging');
+
 
 
 $app->register(Illuminate\Mail\MailServiceProvider::class);

@@ -255,16 +255,23 @@ class TaskController extends Controller
         ]);
     }
 
-    //Apis for getting tasks completed per day for the last 7 days
-    //For analytics
+    // Apis for getting tasks completed per day for the last 7 days
+    // For analytics
     public function getCompletedTasksPerDay(Request $request)
     {
         $today = Carbon::today();
         $startDate = $today->copy()->subDays(6);
 
-        $tasks = Task::selectRaw('end_date as date, COUNT(*) as count')
+        $tasksQuery = Task::selectRaw('end_date as date, COUNT(*) as count')
             ->where('status', 'completed')
-            ->whereBetween('end_date', [$startDate->toDateString(), $today->toDateString()])
+            ->whereBetween('end_date', [$startDate->toDateString(), $today->toDateString()]);
+
+        // Apply assignee filter if provided
+        if ($request->filled('assignee')) {
+            $tasksQuery->where('assignee', $request->input('assignee'));
+        }
+
+        $tasks = $tasksQuery
             ->groupBy('end_date')
             ->get();
 
@@ -285,13 +292,17 @@ class TaskController extends Controller
         ]);
     }
 
-    //Returning the count of tasks that are overdue
-    //Analytics
+    // Returning the count of tasks that are overdue
+    // Analytics
     public function overDueTasks(Request $request)
     {
         $tasks = Task::where('due_date', '<', Carbon::today())
             ->where('status', '!=', 'completed')
-            ->get();
+            ->orWhere('status', '!=', 'overdue');
+
+        if ($request->filled('assignee')) {
+            $tasks->where('assignee', $request->input('assignee'));
+        }
 
         $count = $tasks->count();
 
@@ -301,16 +312,19 @@ class TaskController extends Controller
         ], 200);
     }
 
-    //Count of tasks completed this month
-    //Analytics
+    // Count of tasks completed this month
+    // Analytics
     public function taskCompletedThisMonth(Request $request)
     {
         $startOfMonth = Carbon::now()->startOfMonth();
         $endOfMonth = Carbon::now()->endOfMonth();
 
         $tasks = Task::where('status', 'completed')
-            ->whereBetween('end_date', [$startOfMonth, $endOfMonth])
-            ->get();
+            ->whereBetween('end_date', [$startOfMonth, $endOfMonth]);
+
+        if ($request->filled('assignee')) {
+            $tasks->where('assignee', $request->input('assignee'));
+        }
 
         $count = $tasks->count();
 
@@ -321,7 +335,7 @@ class TaskController extends Controller
     }
 
     // Get task countof tasks created per VS Completed per month for the last 12 months
-    //Analytics
+    // Analytics
     public function byMonths(Request $request)
     {
         $now = Carbon::now();
@@ -350,7 +364,6 @@ class TaskController extends Controller
                 return $item->year . '-' . str_pad($item->month, 2, '0', STR_PAD_LEFT);
             });
 
-        
         $createdArr = [];
         $completedArr = [];
         for ($i = 0; $i < 12; $i++) {
@@ -385,13 +398,39 @@ class TaskController extends Controller
             return response()->json(['error' => $validator->errors()], 422);
         }
 
+
         $oldStatus = $task->status;
-        $task->status = $request->input('status');
+        
+        $newStatus = $request->input('status');
+
+        if( $newStatus === 'unassigned'){
+            $task->assignee = null;
+            $task->start_date = null;
+        }
+
+        if( $oldStatus === 'unassigned' && $newStatus !== 'cancelled'){
+            return response()->json(['error' => 'Select an Assignee before changing the status.'], 422);
+        }
+
+        
+        if ($newStatus === 'completed'){
+            $task->end_date = Carbon::today()->toDateString();
+        }
+        
 
         if ($oldStatus !== 'completed' && $task->status === 'completed') {
             $task->end_date = Carbon::today()->toDateString();
         }
 
+        if( $oldStatus === 'pending' && $newStatus ==='overdue'){
+            return response()->json(['error' => 'Due date is yet to come'], 422);
+        }
+
+        if( $oldStatus === 'overdue' && $newStatus ==='pending'){
+            return response()->json(['error' => 'Due date has passed'], 422);
+        }
+
+        $task->status = $newStatus;
         $task->save();
         if ($task->created_by) {
             $notification = Notification::create([
