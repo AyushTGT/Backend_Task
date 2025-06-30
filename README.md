@@ -46,9 +46,6 @@ A robust and secure User & Task Management tool built using the [Lumen](https://
 
 3. **Environment Setup**
     - Copy `.env.example` to `.env`:
-      ```sh
-      cp .env.example .env
-      ```
     - Set your database credentials and other settings in `.env`.
 
 4. **Queue and Email Setup**
@@ -56,13 +53,7 @@ A robust and secure User & Task Management tool built using the [Lumen](https://
     - Add you Pusher Credentials
     - Add your smtp Credientials
 
-5. **Scheduler Setup**
-    - To enable scheduled tasks, add the following to your server's crontab:
-      ```
-      * * * * * cd /path-to-your-project && php artisan schedule:run >> /dev/null 2>&1
-      ```
-
-6. **Run the Application**
+5. **Run the Application**
     ```sh
     php -S localhost:8000 -t public
     ```
