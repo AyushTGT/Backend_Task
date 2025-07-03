@@ -34,9 +34,7 @@ class NotificationController extends Controller
         $query = Notification::query();
 
         if ($assignee) {
-            $query->
-            where('assignee', $assignee)
-                ->where('status', 'unread');
+            $query->where('assignee', $assignee)->where('status', 'unread');
         }
 
         $notifications = $query->get();

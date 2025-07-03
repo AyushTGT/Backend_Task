@@ -26,4 +26,12 @@ class NotificationCreated extends Event implements ShouldBroadcast
     {
         return 'notification.created';
     }
+
+    public function broadcastWith()
+    {
+        return [
+            'notification' => $this->notification,
+            'assignee' => $this->assignee,
+        ];
+    }
 }

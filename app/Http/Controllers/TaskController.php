@@ -42,7 +42,7 @@ class TaskController extends Controller
                 'assignee' => (string) $task->assignee,
                 'status' => 'unread',
                 'title' => 'New Task Assigned',
-                'description' => 'You have been assigned a new task: ' . $task->title,
+                'description' => "You have been assigned a new task: {$task->title}",
             ]);
             event(new NotificationCreated($notification, $task->assignee));
         }
@@ -244,7 +244,7 @@ class TaskController extends Controller
                 'assignee' => (string) $task->created_by,
                 'status' => 'unread',
                 'title' => 'Task Status Changed',
-                'description' => 'Your task status has been changed: ' . $task->title . 'to ' . $task->status,
+                'description' => "Your task status has been changed: {$task->title} to {$task->status}",
             ]);
             event(new NotificationCreated($notification, $task->created_by));
         }
@@ -298,7 +298,7 @@ class TaskController extends Controller
     {
         $tasks = Task::where('due_date', '<', Carbon::today())
             ->where('status', '!=', 'completed')
-            ->orWhere('status', '!=', 'overdue');
+            ->orWhere('status', '==', 'overdue');
 
         if ($request->filled('assignee')) {
             $tasks->where('assignee', $request->input('assignee'));
@@ -437,7 +437,7 @@ class TaskController extends Controller
                 'assignee' => (string) $task->created_by,
                 'status' => 'unread',
                 'title' => 'Task Status Changed',
-                'description' => 'Your task status has been changed: ' . $task->title . 'to ' . $task->status,
+                'description' => "Your task status has been changed: {$task->title} to {$task->status}"
             ]);
             event(new NotificationCreated($notification, $task->created_by));
         }

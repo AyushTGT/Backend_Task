@@ -15,6 +15,7 @@ class Kernel extends ConsoleKernel
      */
     protected $commands = [
         \App\Console\Commands\SendEmails::class,
+        \App\Console\Commands\TestNotification::class,
     ];
 
     /**
@@ -27,8 +28,8 @@ class Kernel extends ConsoleKernel
     {
         $schedule
             ->command('tasks:send_summaryEmails')
-            ->dailyAt('10:51')
-            ->timezone('Asia/Kolkata');
+            ->dailyAt(config('constants.email_time', '23:59'))
+            ->timezone(config('constants.default_timezone', 'Asia/Kolkata'));
         // Artisan::call('tasks:send_summaryEmails');
     }
 }

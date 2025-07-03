@@ -26,50 +26,50 @@ $router->get('/dashboard', 'UserController@dashboard' );
 
 
 //The Required APIS
-$router->post('/RegisteringUser', 'UserController@RegisteringUser');
-$router->post('/addUser', 'UserController@AddUser');
+$router->post('/RegisteringUser', 'UserController@RegisteringUser'); //done
+$router->post('/addUser', 'UserController@AddUser'); //done
 
-$router->get('/emailVerification', 'UserController@verifyEmail');
-$router->post('/login', 'UserController@postLogin' );
-$router->post('/forgetPassword', 'UserController@forgetPassword');
-$router->post('/resetPassword', 'UserController@resetPassword');
-$router->get('/resetForm', 'UserController@resetForm');
-$router->get('/checkEmail', 'UserController@checkEmail');
-$router->get('/exportCSV', 'UserController@exportCSV');
+$router->get('/emailVerification', 'UserController@verifyEmail'); //done
+$router->post('/login', 'UserController@postLogin' );  //done
+$router->post('/forgetPassword', 'UserController@forgetPassword'); //done
+$router->post('/resetPassword', 'UserController@resetPassword'); //done
+// $router->get('/resetForm', 'UserController@resetForm');
+$router->get('/checkEmail', 'UserController@checkEmail'); //done
+$router->get('/exportCSV', 'UserController@exportCSV'); //done
 $router->post('/reRegisteringUser', 'UserController@reRegisteringUser');
 
 
 
 $router->group(['middleware'=>"auth"],function($router){
-    $router->get('/getUsers', 'UserController@getUser' );
+    $router->get('/getUsers', 'UserController@getUser' ); //done
     // $router->get('/getAll', 'UserController@all' );
-    $router->delete('/delUser/{id}', 'UserController@delete' );
-    $router->delete('/bulkDelete', 'UserController@bulkDelete' );
-    $router->put('/bulkRole', 'UserController@bulkRole' );
-    $router->put('/updateUser/{id}', 'UserController@update' );
-    $router->post('/logout', 'UserController@postLogout' );
-    $router->get('/me', 'UserController@me' );
-    $router->post('/masterVerify/{id}', 'UserController@masterVerify' );   
-    $router->get('/getTasks', 'UserController@getTasks'); 
+    $router->delete('/delUser/{id}', 'UserController@delete' ); //done
+    $router->delete('/bulkDelete', 'UserController@bulkDelete' ); //done
+    $router->put('/bulkRole', 'UserController@bulkRole' ); //done
+    $router->put('/updateUser/{id}', 'UserController@update' ); //done
+    $router->post('/logout', 'UserController@postLogout' ); ///done
+    $router->get('/me', 'UserController@me' ); //done
+    $router->post('/masterVerify/{id}', 'UserController@masterVerify' );  //done 
+    $router->get('/getTasks', 'UserController@getTasks'); //done
 });
 
 //task apis
-$router->post('/addTask', 'TaskController@addTask');
-$router->put('/updateTask/{id}', 'TaskController@updateTask');
-$router->put('/updateTaskStatus/{id}', 'TaskController@updateTaskStatus');
+$router->post('/addTask', 'TaskController@addTask'); //done
+$router->put('/updateTask/{id}', 'TaskController@updateTask'); //done
+$router->put('/updateTaskStatus/{id}', 'TaskController@updateTaskStatus'); //done
 // $router->get('/getTasks', 'TaskController@getTasks');
-$router->get('/filterTasks', 'TaskController@filterTasks');
+$router->get('/filterTasks', 'TaskController@filterTasks'); //done
 
-$router->get('/countTasks', 'TaskController@countTasks');
-$router->get('/userName', 'UserController@userName');
-$router->get('/completedTasks', 'TaskController@getCompletedTasksPerDay');
-$router->get('/overdueTasks', 'TaskController@overDueTasks');
-$router->get('/taskCompletedThisMonth', 'TaskController@taskCompletedThisMonth');
-$router->get('/byMonths', 'TaskController@byMonths');
+$router->get('/countTasks', 'TaskController@countTasks'); //done
+$router->get('/userName', 'UserController@userName'); //done
+$router->get('/completedTasks', 'TaskController@getCompletedTasksPerDay'); //done
+$router->get('/overdueTasks', 'TaskController@overDueTasks'); //done
+$router->get('/taskCompletedThisMonth', 'TaskController@taskCompletedThisMonth'); //done
+$router->get('/byMonths', 'TaskController@byMonths'); //done
 
 //Notif
-$router->get('/notifications', 'NotificationController@getNotif');
-$router->post('/notifications/{id}/read', 'NotificationController@markAsRead');
+$router->get('/notifications', 'NotificationController@getNotif'); //done
+$router->post('/notifications/{id}/read', 'NotificationController@markAsRead'); //done
 
 
 // CORS Middleware But did not work

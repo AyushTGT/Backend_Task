@@ -28,7 +28,7 @@ class UserController extends Controller
     public function __construct(
         JWTAuth $jwt,
         UserService $userService,
-        AuthService $authService,
+        AuthService $authService
     ) {
         $this->jwt = $jwt;
         $this->userService = $userService;
@@ -41,7 +41,22 @@ class UserController extends Controller
         $this->validate($request, [
             'email' => 'required|email|max:255',
             'password' => 'required',
+            'recaptchaToken' => 'required',
         ]);
+
+        $client = new \GuzzleHttp\Client();
+        $response = $client->post('https://www.google.com/recaptcha/api/siteverify', [
+            'form_params' => [
+                'secret' => '6LcDu3IrAAAAACLcc8FQ2YvpRT7l8M4MkbhcCOIM',
+                'response' => $request->recaptchaToken,
+                'remoteip' => $request->ip(),
+            ],
+        ]);
+        $body = json_decode((string) $response->getBody(), true);
+
+        if (empty($body['success']) || !$body['success']) {
+            return response()->json(['error' => 'CAPTCHA verification failed'], 422);
+        }
 
         $result = $this->authService->loginService($request->email, $request->password);
 
@@ -74,7 +89,8 @@ class UserController extends Controller
         $this->validate($request, [
             'name' => 'required|string',
             'email' => 'required|email|unique:users',
-            'password' => 'required|string|min:8'
+            'password' => 'required|string|min:8',
+            'post' => 'required|string|in:User,Admin,Master',
         ]);
 
         $user = $this->userService->findByEmail($request->email);
@@ -274,7 +290,9 @@ class UserController extends Controller
         if (!$role) {
             return response()->json(['error' => 'No role specified.'], 400);
         }
-        $allowedRoles = ['User', 'Admin', 'Master'];
+        // $allowedRoles = ['User', 'Admin', 'Master'];
+        $allowedRoles = config('constants.allowed_roles');
+
         if (!in_array($role, $allowedRoles)) {
             return response()->json(['error' => 'Invalid role specified.'], 400);
         }
@@ -327,6 +345,12 @@ class UserController extends Controller
     // If trying to edit master error
     public function update(Request $request, $id)
     {
+        $this->validate($request, [
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
+            'post' => 'required|string',
+        ]);
+
         $authUser = Auth::user();
         if ($authUser->post === 'User') {
             return response()->json(['error' => "Forbidden: You can't edit users."], 403);
@@ -336,7 +360,7 @@ class UserController extends Controller
         if (!$user) {
             return response()->json(['error' => 'User not found.'], 404);
         }
-        if($user->deleted_by !== null) {
+        if ($user->deleted_by !== null) {
             return response()->json(['error' => 'User has been deleted by admin.'], 403);
         }
         if ($user->post === 'Master') {
@@ -367,7 +391,7 @@ class UserController extends Controller
         return response()->json(['message' => 'User updated successfully.', 'user' => $user]);
     }
 
-    //Sending a password reset link to the user's email
+    // Sending a password reset link to the user's email
     public function forgetPassword(Request $request)
     {
         $this->validate($request, [
@@ -392,7 +416,6 @@ class UserController extends Controller
             'message' => 'Password reset link sent. Please check your email.'
         ], 200);
     }
-    
 
     // Resetting the password after the user clicks on the reset link
     public function resetPassword(Request $request)
@@ -410,8 +433,8 @@ class UserController extends Controller
         ], 200);
     }
 
-    //Checking the availability of the email use,
-    //Whether it exists, verified, or deleted
+    // Checking the availability of the email use,
+    // Whether it exists, verified, or deleted
     public function checkEmail(Request $request)
     {
         $email = $request->input('email');
@@ -468,7 +491,7 @@ class UserController extends Controller
         return response()->json($user);
     }
 
-    //Master Verify in case required to bring back the deleted user
+    // Master Verify in case required to bring back the deleted user
     // public function masterVerify(Request $request, $id)
     // {
     //     $authUser = Auth::user();
@@ -505,7 +528,7 @@ class UserController extends Controller
         }
 
         $output = fopen('php://temp', 'r+');
-        
+
         fputcsv($output, array_keys($users->first()->toArray()));
         foreach ($users as $user) {
             fputcsv($output, $user->toArray());
@@ -521,17 +544,17 @@ class UserController extends Controller
         return response($csv, 200, $headers);
     }
 
-    //Exporting the username and id, to ease the mapping while task assignment
-    //This is used in the task assignment dropdown
+    // Exporting the username and id, to ease the mapping while task assignment
+    // This is used in the task assignment dropdown
     public function userName()
     {
         $users = User::select('id', 'name')->whereNull('deleted_by')->get();
         return response()->json($users);
     }
 
-    //Based on the user's role, the tasks are fetched
-    //If the user is a Master, all tasks are fetched
-    //If the user is not a Master, only the tasks assigned to the user or created by the user are fetched
+    // Based on the user's role, the tasks are fetched
+    // If the user is a Master, all tasks are fetched
+    // If the user is not a Master, only the tasks assigned to the user or created by the user are fetched
     public function getTasks(Request $request)
     {
         $user = Auth::user();
