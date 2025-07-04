@@ -11,9 +11,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Str;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use Tymon\JWTAuth\JWTAuth;
 use Hash;
 
@@ -115,7 +113,8 @@ class UserController extends Controller
             'verification_token' => $verificationToken,
         ]);
 
-        $frontendUrl = 'http://localhost:3000/verified?token=' . $verificationToken;
+        // $frontendUrl = 'http://localhost:3000/verified?token=' . $verificationToken;
+        $frontendUrl = config('constants.BASE_URL') . '/verified?token=' . $verificationToken;
         Mail::html(
             "Please verify your email by clicking this link: <a href=\"$frontendUrl\">$frontendUrl</a>",
             function ($message) use ($user) {
@@ -143,7 +142,8 @@ class UserController extends Controller
         $user->deleted_by = null;
         $user->save();
 
-        $frontendUrl = 'http://localhost:3000/verified?token=' . $verificationToken;
+        //$frontendUrl = 'http://localhost:3000/verified?token=' . $verificationToken;
+        $frontendUrl = config('constants.BASE_URL') . '/verified?token=' . $verificationToken;
         Mail::html(
             "Please verify your email by clicking this link: <a href=\"$frontendUrl\">$frontendUrl</a>",
             function ($message) use ($user) {
@@ -176,7 +176,8 @@ class UserController extends Controller
             'verification_token' => $verificationToken,
         ]);
 
-        $frontendUrl = 'http://localhost:3000/verified?token=' . $verificationToken;
+        //$frontendUrl = 'http://localhost:3000/verified?token=' . $verificationToken;
+        $frontendUrl = config('constants.BASE_URL') . '/verified?token=' . $verificationToken;
 
         $changePasswordUrl = 'http://localhost:3000/reset?email=' . $user->email;
         Mail::html(
@@ -290,7 +291,7 @@ class UserController extends Controller
         if (!$role) {
             return response()->json(['error' => 'No role specified.'], 400);
         }
-        // $allowedRoles = ['User', 'Admin', 'Master'];
+        //$allowedRoles = ['User', 'Admin', 'Master'];
         $allowedRoles = config('constants.allowed_roles');
 
         if (!in_array($role, $allowedRoles)) {
@@ -323,10 +324,10 @@ class UserController extends Controller
         if (!$user) {
             return response()->json(['message' => 'Invalid or expired verification token.'], 400);
         }
-        $nuser = User::where('verification_token', $token)->first();
-        $nuser->email_verified_at = Carbon::now();
-        $nuser->verification_token = null;
-        $nuser->save();
+        // $nuser = User::where('verification_token', $token)->first();
+        $user->email_verified_at = Carbon::now();
+        $user->verification_token = null;
+        $user->save();
 
         Mail::html(
             'Welcome to our application, your email has been verified successfully. You can now log in with your credentials.',
@@ -376,7 +377,8 @@ class UserController extends Controller
             $verificationToken = Str::random(60);
             $user->verification_token = $verificationToken;
 
-            $frontendUrl = 'http://localhost:3000/verified?token=' . $verificationToken;
+            //$frontendUrl = 'http://localhost:3000/verified?token=' . $verificationToken;
+            $frontendUrl = config('constants.BASE_URL') . '/verified?token=' . $verificationToken;
             Mail::html(
                 "Please verify your new email by clicking this link: <a href=\"$frontendUrl\">$frontendUrl</a>",
                 function ($message) use ($user) {
@@ -401,7 +403,8 @@ class UserController extends Controller
         $user = User::where('email', $request->email)->first();
 
         // $resetUrl = url('/resetForm?email=' . urlencode($user->email));
-        $frontendUrl = 'http://localhost:3000/reset?email=' . $user->email;
+        //$frontendUrl = 'http://localhost:3000/reset?email=' . $user->email;
+        $frontendUrl = config('constants.BASE_URL') . '/reset?email=' . $user->email;
 
         Mail::html(
             "Click this link to reset your password: <a href=\"$frontendUrl\">Reset Password</a>",
@@ -491,29 +494,34 @@ class UserController extends Controller
         return response()->json($user);
     }
 
-    // Master Verify in case required to bring back the deleted user
-    // public function masterVerify(Request $request, $id)
-    // {
-    //     $authUser = Auth::user();
-    //     if ($authUser->post === 'Master') {
-    //         return response()->json(['error' => "Forbidden: You can't verify users."], 403);
-    //     }
+    //Master Verify in case required to bring back the deleted user
+    public function masterVerify(Request $request, $id)
+    {
+        $user = User::where('id', $id)->first();
+        if (!$user) {
+            return response()->json(['error' => 'User not found.'], 404);
+        }
 
-    //     $user = User::where('id', $id)->first();
-    //     if (!$user) {
-    //         return response()->json(['error' => 'User not found.'], 404);
-    //     }
+        if ($user->email_verified_at) {
+            return response()->json(['message' => 'User already verified.'], 200);
+        }
+        $user->deleted_by = null;
+        $user->save();
 
-    //     if ($user->email_verified_at) {
-    //         return response()->json(['message' => 'User already verified.'], 200);
-    //     }
+        
 
-    //     $user->email_verified_at = Carbon::now();
-    //     $user->verification_token = null;
-    //     $user->save();
+        $frontendUrl = config('constants.BASE_URL') . '/verified?token=' . $user->verification_token;
+        Mail::html(
+            "Please verify your email by clicking this link: <a href=\"$frontendUrl\">$frontendUrl</a>",
+            function ($message) use ($user) {
+                $message
+                    ->to($user->email)
+                    ->subject('Verify Your Email');
+            }
+        );
 
-    //     return response()->json(['message' => 'User verified successfully.']);
-    // }
+        return response()->json(['message' => 'Verification email sent to user.']);
+    }
 
     // Exporting the users to a CSV file
     public function exportCSV(Request $request)

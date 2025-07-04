@@ -28,7 +28,7 @@ class Kernel extends ConsoleKernel
     {
         $schedule
             ->command('tasks:send_summaryEmails')
-            ->dailyAt(config('constants.email_time', '23:59'))
+            ->dailyAt(config('constants.email_time', '11:59'))
             ->timezone(config('constants.default_timezone', 'Asia/Kolkata'));
         // Artisan::call('tasks:send_summaryEmails');
     }

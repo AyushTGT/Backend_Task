@@ -1,21 +1,22 @@
 <?php
 
 return [
-    'default' => 'pusher',
+    'default' => env('BROADCAST_DRIVER', 'null'),
+    
     'connections' => [
         'pusher' => [
             'driver' => 'pusher',
-            'key' => '9ebcfeb7c106c3456664',
-            'secret' => 'f9c06e6027eeda56a8cb',
-            'app_id' => '2012032',
+            'key' => env('PUSHER_APP_KEY'),
+            'secret' => env('PUSHER_APP_SECRET'),
+            'app_id' => env('PUSHER_APP_ID'),
             'options' => [
-                'cluster' => 'ap2',
+                'cluster' => env('PUSHER_APP_CLUSTER'),
                 'useTLS' => true,
-                'curl_options' => [
-                    CURLOPT_SSL_VERIFYPEER => false,
-                    CURLOPT_SSL_VERIFYHOST => false,
-                ],
             ],
+        ],
+        
+        'null' => [
+            'driver' => 'null',
         ],
     ],
 ];

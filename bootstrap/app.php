@@ -30,10 +30,12 @@ $app->configure('mail');
 $app->configure('cors');
 $app->configure('broadcasting');
 $app->configure('logging');
-
+$app->configure('constants');
 
 
 $app->register(Illuminate\Mail\MailServiceProvider::class);
+$app->register(Illuminate\Broadcasting\BroadcastServiceProvider::class);
+
 class_alias(Illuminate\Support\Facades\Mail::class, 'Mail');
 
 
@@ -113,7 +115,6 @@ $app->middleware([
 $app->register('Nord\Lumen\Cors\CorsServiceProvider');
 
 $app->register(App\Providers\AppServiceProvider::class);
-$app->register(Illuminate\Broadcasting\BroadcastServiceProvider::class);
 
 $app->register(App\Providers\AuthServiceProvider::class);
 $app->register(App\Providers\EventServiceProvider::class);

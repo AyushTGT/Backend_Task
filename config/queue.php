@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'default' => env('QUEUE_CONNECTION', 'database'),
+    'default' => 'sync',
     'connections' => [
         'database' => [
             'driver' => 'database',
@@ -10,6 +10,9 @@ return [
             'retry_after' => 90,
         ],
         // Add redis or others if needed
+        'sync' => [
+            'driver' => 'sync',
+        ],
     ],
     'failed' => [
         'driver' => 'database',

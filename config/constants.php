@@ -2,6 +2,6 @@
   return [
     'allowed_roles' => ['User', 'Admin', 'Master'],
     'default_timezone' => 'Asia/Kolkata',
-    'email_time' => '23:59',
+    'email_time' => '11:22',
     'BASE_URL' => 'http://localhost:8000',
 ];
