@@ -10,9 +10,7 @@ use Illuminate\Http\Request;
 
 class TaskService
 {
-    /**
-     * Apply common filters to task queries
-     */
+    //Filter query based on request parameters
     public function applyFilters($query, Request $request): void
     {
         // Search filter
@@ -36,7 +34,6 @@ class TaskService
             }
         }
 
-        // Handle 'reporter' mapping to 'created_by'
         if ($request->filled('reporter')) {
             $query->where('created_by', $request->input('reporter'));
         }
@@ -61,9 +58,9 @@ class TaskService
         }
     }
 
-    /**
-     * Send notification when task is created/assigned
-     */
+    
+     //Send notification when task is created/assigned
+     
     public function sendTaskNotification(Task $task, string $type): void
     {
         if (!$task->assignee && $type === 'assigned') return;
@@ -96,9 +93,7 @@ class TaskService
         event(new NotificationCreated($notification, $config['assignee']));
     }
 
-    /**
-     * Validate status transitions with business rules
-     */
+    //Error messages for invalid status transitions
     public function validateStatusTransition(string $oldStatus, string $newStatus): ?string
     {
         if ($oldStatus === 'unassigned' && $newStatus !== 'cancelled') {

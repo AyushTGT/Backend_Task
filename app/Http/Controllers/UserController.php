@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Modesl\Task;
+use App\Models\Task; 
 use App\Services\AuthService;
 use App\Services\UserService;
 use Carbon\Carbon;
@@ -13,6 +13,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Tymon\JWTAuth\JWTAuth;
+use Tymon\JWTAuth\Exceptions\JWTException;
+use Tymon\JWTAuth\Exceptions\TokenExpiredException;
+use Tymon\JWTAuth\Exceptions\TokenInvalidException;
+use GuzzleHttp\Client;
 use Hash;
 
 class UserController extends Controller
@@ -42,10 +46,10 @@ class UserController extends Controller
             'recaptchaToken' => 'required',
         ]);
 
-        $client = new \GuzzleHttp\Client();
+        $client = new Client();
         $response = $client->post('https://www.google.com/recaptcha/api/siteverify', [
             'form_params' => [
-                'secret' => '6LcDu3IrAAAAACLcc8FQ2YvpRT7l8M4MkbhcCOIM',
+                'secret' => env('RECAPTCHA_SECRET_KEY'),
                 'response' => $request->recaptchaToken,
                 'remoteip' => $request->ip(),
             ],
@@ -68,11 +72,11 @@ class UserController extends Controller
             if (!$token = auth()->attempt($request->only('email', 'password'))) {
                 return response()->json(['error' => 'Invalid credentials.'], 401);
             }
-        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
+        } catch (TokenExpiredException $e) {
             return response()->json(['error' => 'Token expired.'], 500);
-        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
+        } catch (TokenInvalidException $e) {
             return response()->json(['error' => 'Token invalid.'], 500);
-        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
+        } catch (JWTException $e) {
             return response()->json(['error' => 'Could not create token.'], 500);
         }
 
@@ -105,7 +109,7 @@ class UserController extends Controller
 
         $verificationToken = Str::random(60);
 
-        $user = User::create([
+        $user = $this->userService->createUser([
             'name' => $request->name,
             'email' => $request->email,
             'password' => app('hash')->make($request->password),
@@ -113,7 +117,6 @@ class UserController extends Controller
             'verification_token' => $verificationToken,
         ]);
 
-        // $frontendUrl = 'http://localhost:3000/verified?token=' . $verificationToken;
         $frontendUrl = config('constants.BASE_URL') . '/verified?token=' . $verificationToken;
         Mail::html(
             "Please verify your email by clicking this link: <a href=\"$frontendUrl\">$frontendUrl</a>",
@@ -135,14 +138,15 @@ class UserController extends Controller
             'email' => 'required|email',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        $user = $this->userService->findByEmail($request->email);
         $verificationToken = Str::random(60);
-        $user->verification_token = $verificationToken;
-        $user->email_verified_at = null;
-        $user->deleted_by = null;
-        $user->save();
+        
+        $this->userService->updateUser($user, [
+            'verification_token' => $verificationToken,
+            'email_verified_at' => null,
+            'deleted_by' => null
+        ]);
 
-        //$frontendUrl = 'http://localhost:3000/verified?token=' . $verificationToken;
         $frontendUrl = config('constants.BASE_URL') . '/verified?token=' . $verificationToken;
         Mail::html(
             "Please verify your email by clicking this link: <a href=\"$frontendUrl\">$frontendUrl</a>",
@@ -168,7 +172,7 @@ class UserController extends Controller
         $verificationToken = Str::random(60);
         $passwordValue = Str::random(10);
 
-        $user = User::create([
+        $user = $this->userService->createUser([
             'name' => $request->name,
             'email' => $request->email,
             'password' => app('hash')->make($passwordValue),
@@ -176,10 +180,9 @@ class UserController extends Controller
             'verification_token' => $verificationToken,
         ]);
 
-        //$frontendUrl = 'http://localhost:3000/verified?token=' . $verificationToken;
         $frontendUrl = config('constants.BASE_URL') . '/verified?token=' . $verificationToken;
-
         $changePasswordUrl = 'http://localhost:3000/reset?email=' . $user->email;
+        
         Mail::html(
             "Please verify your email first by clicking this link: <a href=\"$frontendUrl\" target=\"_blank\">Verify Email</a>
             Please change the password after verification. 
@@ -209,12 +212,6 @@ class UserController extends Controller
         return response()->json($users);
     }
 
-    // public function all()
-    // {
-    //     $users = User::all();
-    //     return response()->json($users);
-    // }
-
     // Deleting a particular user by ID, only Master can delete users
     // We are soft deleting the user by setting email_verified_at to null and deleted_by to the auth user's email
     public function delete($id)
@@ -228,9 +225,8 @@ class UserController extends Controller
         if (!$user) {
             return response()->json(['error' => 'User not found.'], 404);
         }
-        $user->email_verified_at = NULL;
-        $user->deleted_by = $authUser->email;
-        $user->save();
+        
+        $this->userService->softDeleteUser($user, $authUser->email);
 
         return response()->json(['message' => 'User deleted.']);
     }
@@ -253,7 +249,7 @@ class UserController extends Controller
             ], 400);
         }
 
-        $users = User::whereIn('id', $ids)->get();
+        $users = $this->userService->findUsersByIds($ids);
         foreach ($users as $user) {
             if ($user->post === 'Master') {
                 return response()->json([
@@ -263,9 +259,7 @@ class UserController extends Controller
         }
 
         foreach ($users as $user) {
-            $user->email_verified_at = null;
-            $user->deleted_by = $authUser->email;
-            $user->save();
+            $this->userService->softDeleteUser($user, $authUser->email);
         }
 
         return response()->json([
@@ -291,23 +285,22 @@ class UserController extends Controller
         if (!$role) {
             return response()->json(['error' => 'No role specified.'], 400);
         }
-        //$allowedRoles = ['User', 'Admin', 'Master'];
+        
         $allowedRoles = config('constants.allowed_roles');
 
         if (!in_array($role, $allowedRoles)) {
             return response()->json(['error' => 'Invalid role specified.'], 400);
         }
 
-        $users = User::whereIn('id', $ids)->get();
+        $users = $this->userService->findUsersByIds($ids);
         foreach ($users as $user) {
             if ($user->post === 'Master') {
                 return response()->json(['error' => 'You selected a Master. Cannot change role of master user.'], 403);
             }
         }
-        foreach ($users as $user) {
-            $user->post = $role;
-            $user->save();
-        }
+        
+        $this->userService->bulkUpdatePost($users, $role);
+        
         return response()->json(['message' => 'Users role changed.', 'count' => count($users)]);
     }
 
@@ -320,14 +313,12 @@ class UserController extends Controller
             return response()->json(['message' => 'Missing verification token.'], 400);
         }
 
-        $user = User::where('verification_token', $token)->first();
+        $user = $this->userService->findByVerificationToken($token);
         if (!$user) {
             return response()->json(['message' => 'Invalid or expired verification token.'], 400);
         }
-        // $nuser = User::where('verification_token', $token)->first();
-        $user->email_verified_at = Carbon::now();
-        $user->verification_token = null;
-        $user->save();
+        
+        $this->userService->verifyUser($user);
 
         Mail::html(
             'Welcome to our application, your email has been verified successfully. You can now log in with your credentials.',
@@ -357,7 +348,7 @@ class UserController extends Controller
             return response()->json(['error' => "Forbidden: You can't edit users."], 403);
         }
 
-        $user = User::where('id', $id)->first();
+        $user = $this->userService->findById($id);
         if (!$user) {
             return response()->json(['error' => 'User not found.'], 404);
         }
@@ -368,16 +359,15 @@ class UserController extends Controller
             return response()->json(['error' => 'You cannot edit a Master user.'], 403);
         }
 
-        $user->name = $request->input('name');
+        $updateData = ['name' => $request->input('name')];
 
         $newEmail = $request->input('email');
         if ($newEmail && $newEmail !== $user->email) {
-            $user->email = $newEmail;
-            $user->email_verified_at = null;
+            $updateData['email'] = $newEmail;
+            $updateData['email_verified_at'] = null;
             $verificationToken = Str::random(60);
-            $user->verification_token = $verificationToken;
+            $updateData['verification_token'] = $verificationToken;
 
-            //$frontendUrl = 'http://localhost:3000/verified?token=' . $verificationToken;
             $frontendUrl = config('constants.BASE_URL') . '/verified?token=' . $verificationToken;
             Mail::html(
                 "Please verify your new email by clicking this link: <a href=\"$frontendUrl\">$frontendUrl</a>",
@@ -388,8 +378,10 @@ class UserController extends Controller
                 }
             );
         }
-        $user->post = $request->input('post', $user->post);
-        $user->save();
+        
+        $updateData['post'] = $request->input('post', $user->post);
+        $user = $this->userService->updateUser($user, $updateData);
+        
         return response()->json(['message' => 'User updated successfully.', 'user' => $user]);
     }
 
@@ -400,10 +392,8 @@ class UserController extends Controller
             'email' => 'required|email|exists:users,email',
         ]);
 
-        $user = User::where('email', $request->email)->first();
+        $user = $this->userService->findByEmail($request->email);
 
-        // $resetUrl = url('/resetForm?email=' . urlencode($user->email));
-        //$frontendUrl = 'http://localhost:3000/reset?email=' . $user->email;
         $frontendUrl = config('constants.BASE_URL') . '/reset?email=' . $user->email;
 
         Mail::html(
@@ -427,9 +417,8 @@ class UserController extends Controller
             'password' => 'required|min:8',
         ]);
 
-        $user = User::where('email', $request->email)->first();
-        $user->password = app('hash')->make($request->password);
-        $user->save();
+        $user = $this->userService->findByEmail($request->email);
+        $this->userService->updatePassword($user, $request->password);
 
         return response()->json([
             'message' => 'Password reset successfully.'
@@ -445,7 +434,7 @@ class UserController extends Controller
             return response()->json(['error' => 'Email is required'], 400);
         }
 
-        $user = User::where('email', $email)->first();
+        $user = $this->userService->findByEmail($email);
 
         if (!$user) {
             return response()->json([
@@ -475,14 +464,10 @@ class UserController extends Controller
             $user = app('auth')->user();
             Auth::logout();
 
-            $user->last_logout = Carbon::now();
-            if ($user->total_duration_loggedin === null) {
-                $user->total_duration_loggedin = 0;
-            }
-            $user->total_duration_loggedin += Carbon::now()->diffInSeconds($user->last_login);
-            $user->save();
+            $this->userService->updateLogoutTimestamps($user);
+            
             return response()->json(['message' => 'Successfully logged out'], 200);
-        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
+        } catch (JWTException $e) {
             return response()->json(['error' => 'Failed to logout, please try again.'], 500);
         }
     }
@@ -497,7 +482,7 @@ class UserController extends Controller
     //Master Verify in case required to bring back the deleted user
     public function masterVerify(Request $request, $id)
     {
-        $user = User::where('id', $id)->first();
+        $user = $this->userService->findById($id);
         if (!$user) {
             return response()->json(['error' => 'User not found.'], 404);
         }
@@ -505,10 +490,8 @@ class UserController extends Controller
         if ($user->email_verified_at) {
             return response()->json(['message' => 'User already verified.'], 200);
         }
-        $user->deleted_by = null;
-        $user->save();
-
         
+        $this->userService->restoreDeletedUser($user);
 
         $frontendUrl = config('constants.BASE_URL') . '/verified?token=' . $user->verification_token;
         Mail::html(
@@ -527,9 +510,7 @@ class UserController extends Controller
     public function exportCSV(Request $request)
     {
         $params = $request->only(['search', 'post', 'sort', 'order']);
-        $query = $this->userService->findUsers($params);
-
-        $users = $query->get();
+        $users = $this->userService->getAllUsersForExport($params);
 
         if ($users->isEmpty()) {
             return response()->json(['message' => 'No users found.'], 404);
@@ -556,7 +537,7 @@ class UserController extends Controller
     // This is used in the task assignment dropdown
     public function userName()
     {
-        $users = User::select('id', 'name')->whereNull('deleted_by')->get();
+        $users = $this->userService->getActiveUsersForDropdown();
         return response()->json($users);
     }
 
