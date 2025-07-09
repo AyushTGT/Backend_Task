@@ -53,4 +53,20 @@ class NotificationController extends Controller
             'data'    => $notification,
         ]);
     }
+
+    public function recentActivity(Request $request)
+    {
+        $assignee = $request->query('assignee');
+        $query = Notification::query();
+
+        if ($assignee) {
+            $query->where('assignee', $assignee)
+                  ->orderBy('updated_at', 'desc');
+        }
+        $query->take(4);
+
+        $notifications = $query->get();
+
+        return response()->json($notifications);
+    }
 }

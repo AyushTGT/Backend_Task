@@ -353,7 +353,7 @@ class UserController extends Controller
         ]);
 
         $authUser = Auth::user();
-        if ($authUser->post === 'User') {
+        if ($authUser->post === 'User' && $authUser->id !== $id) {
             return response()->json(['error' => "Forbidden: You can't edit users."], 403);
         }
 
@@ -364,7 +364,7 @@ class UserController extends Controller
         if ($user->deleted_by !== null) {
             return response()->json(['error' => 'User has been deleted by admin.'], 403);
         }
-        if ($user->post === 'Master') {
+        if ($user->post === 'Master' && $authUser->id != $id) {
             return response()->json(['error' => 'You cannot edit a Master user.'], 403);
         }
 
