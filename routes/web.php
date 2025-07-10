@@ -71,6 +71,8 @@ $router->get('/byMonths', 'TaskController@byMonths'); //done
 $router->get('/notifications', 'NotificationController@getNotif'); //done
 $router->post('/notifications/{id}/read', 'NotificationController@markAsRead'); //done
 $router->get('/recent-activities', 'NotificationController@recentActivity'); //done
+$router->get('/dueToday', 'TaskController@dueToday'); //done
+$router->post('/sendMessage', 'TaskController@sendMessage'); //done
 
 
 // CORS Middleware But did not work

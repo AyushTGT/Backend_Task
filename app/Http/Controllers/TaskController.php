@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\NotificationCreated;
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
 use App\Models\Task;
@@ -42,7 +43,7 @@ class TaskController extends Controller
 
         if ($task->assignee) {
             $this->taskService->sendTaskNotification($task, 'assigned');
-            
+
             // Send email
             $user = User::find($task->assignee);
             if ($user && $user->email) {
@@ -61,7 +62,7 @@ class TaskController extends Controller
     public function filterTasks(Request $request)
     {
         $query = Task::query();
-        
+
         // Use service for complex filtering
         $this->taskService->applyFilters($query, $request);
 
@@ -95,7 +96,7 @@ class TaskController extends Controller
     {
         $user = Auth::user();
         $task = Task::find($id);
-        
+
         if (!$task) {
             return response()->json(['error' => 'Task not found.'], 404);
         }
@@ -283,5 +284,42 @@ class TaskController extends Controller
         }
 
         return response()->json(['created' => $createdArr, 'completed' => $completedArr]);
+    }
+
+    public function sendMessage(Request $request)
+    {
+        $validated = $this->validate($request, [
+            'assignee' => 'required|exists:users,id',
+            'message' => 'required|string|max:500',
+        ]);
+
+        $assignee = User::find($validated['assignee']);
+        if (!$assignee) {
+            return response()->json(['error' => 'Assignee not found.'], 404);
+        }
+
+        $notification = Notification::create([
+            'assignee' => $validated['assignee'],
+            'status' => 'unread',
+            'title' => 'New Message',
+            'description' => $validated['message'],
+        ]);
+
+        event(new NotificationCreated($notification, $validated['assignee']));
+
+        return response()->json(['success' => true, 'message' => 'Message sent successfully']);
+    }
+
+    public function dueToday(Request $request)
+    {
+        $today = Carbon::today();
+        $tasks = Task::whereDate('due_date', $today)
+            ->where('status', '!=', 'completed');
+
+        if ($request->filled('assignee')) {
+            $tasks->where('assignee', $request->input('assignee'));
+        }
+
+        return response()->json($tasks->get());
     }
 }

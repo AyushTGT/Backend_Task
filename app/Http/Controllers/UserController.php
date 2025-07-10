@@ -35,50 +35,62 @@ class UserController extends Controller
 
     // login api, generates JWT token, sets up the login timestamps, and returns the token
     public function postLogin(Request $request)
-    {
-        $this->validate($request, [
-            'email' => 'required|email|max:255',
-            'password' => 'required',
-            'recaptchaToken' => 'required',
-        ]);
+{
+    $this->validate($request, [
+        'email' => 'required|email|max:255',
+        'password' => 'required',
+        'recaptchaToken' => 'required',
+        'rememberMe' => 'boolean', // Add validation for rememberMe
+    ]);
 
-        $client = new \GuzzleHttp\Client();
-        $response = $client->post('https://www.google.com/recaptcha/api/siteverify', [
-            'form_params' => [
-                'secret' => '6LcDu3IrAAAAACLcc8FQ2YvpRT7l8M4MkbhcCOIM',
-                'response' => $request->recaptchaToken,
-                'remoteip' => $request->ip(),
-            ],
-        ]);
-        $body = json_decode((string) $response->getBody(), true);
+    $client = new \GuzzleHttp\Client();
+    $response = $client->post('https://www.google.com/recaptcha/api/siteverify', [
+        'form_params' => [
+            'secret' => '6LcDu3IrAAAAACLcc8FQ2YvpRT7l8M4MkbhcCOIM',
+            'response' => $request->recaptchaToken,
+            'remoteip' => $request->ip(),
+        ],
+    ]);
+    $body = json_decode((string) $response->getBody(), true);
 
-        if (empty($body['success']) || !$body['success']) {
-            return response()->json(['error' => 'CAPTCHA verification failed'], 422);
-        }
-
-        $result = $this->authService->loginService($request->email, $request->password);
-
-        if (isset($result['error'])) {
-            return response()->json(['error' => $result['error']], $result['code']);
-        }
-
-        $user = $result['user'];
-
-        try {
-            if (!$token = auth()->attempt($request->only('email', 'password'))) {
-                return response()->json(['error' => 'Invalid credentials.'], 401);
-            }
-        } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
-            return response()->json(['error' => 'Token expired.'], 500);
-        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
-            return response()->json(['error' => 'Token invalid.'], 500);
-        } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
-            return response()->json(['error' => 'Could not create token.'], 500);
-        }
-
-        $this->authService->updateLoginTimestamps($user);
-        return response()->json(['token' => $token], 200);
+    if (empty($body['success']) || !$body['success']) {
+        return response()->json(['error' => 'CAPTCHA verification failed'], 422);
     }
+
+    $result = $this->authService->loginService($request->email, $request->password);
+
+    if (isset($result['error'])) {
+        return response()->json(['error' => $result['error']], $result['code']);
+    }
+
+    $user = $result['user'];
+
+    try {
+        // Set token TTL based on rememberMe
+        $rememberMe = $request->boolean('rememberMe', false);
+        $ttl = $rememberMe ? 43200 : 10080; // 30 days (43200 min) vs 7 days (10080 min)
+        
+        // Set the token TTL
+        auth()->factory()->setTTL($ttl);
+        
+        if (!$token = auth()->attempt($request->only('email', 'password'))) {
+            return response()->json(['error' => 'Invalid credentials.'], 401);
+        }
+    } catch (\Tymon\JWTAuth\Exceptions\TokenExpiredException $e) {
+        return response()->json(['error' => 'Token expired.'], 500);
+    } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
+        return response()->json(['error' => 'Token invalid.'], 500);
+    } catch (\Tymon\JWTAuth\Exceptions\JWTException $e) {
+        return response()->json(['error' => 'Could not create token.'], 500);
+    }
+
+    $this->authService->updateLoginTimestamps($user);
+    return response()->json([
+        'token' => $token,
+        'expires_in' => $ttl * 60, // Return expiration time in seconds
+        'remember_me' => $rememberMe
+    ], 200);
+}
 
     // Registering a new User, Checking if it already exists
     // Using a random verification token to verify the email, by opening a link in the email
@@ -142,7 +154,7 @@ class UserController extends Controller
         $user->deleted_by = null;
         $user->save();
 
-        //$frontendUrl = 'http://localhost:3000/verified?token=' . $verificationToken;
+        // $frontendUrl = 'http://localhost:3000/verified?token=' . $verificationToken;
         $frontendUrl = config('constants.BASE_URL') . '/verified?token=' . $verificationToken;
         Mail::html(
             "Please verify your email by clicking this link: <a href=\"$frontendUrl\">$frontendUrl</a>",
@@ -176,7 +188,7 @@ class UserController extends Controller
             'verification_token' => $verificationToken,
         ]);
 
-        //$frontendUrl = 'http://localhost:3000/verified?token=' . $verificationToken;
+        // $frontendUrl = 'http://localhost:3000/verified?token=' . $verificationToken;
         $frontendUrl = config('constants.BASE_URL') . '/verified?token=' . $verificationToken;
 
         $changePasswordUrl = 'http://localhost:3000/reset?email=' . $user->email;
@@ -291,7 +303,7 @@ class UserController extends Controller
         if (!$role) {
             return response()->json(['error' => 'No role specified.'], 400);
         }
-        //$allowedRoles = ['User', 'Admin', 'Master'];
+        // $allowedRoles = ['User', 'Admin', 'Master'];
         $allowedRoles = config('constants.allowed_roles');
 
         if (!in_array($role, $allowedRoles)) {
@@ -377,7 +389,7 @@ class UserController extends Controller
             $verificationToken = Str::random(60);
             $user->verification_token = $verificationToken;
 
-            //$frontendUrl = 'http://localhost:3000/verified?token=' . $verificationToken;
+            // $frontendUrl = 'http://localhost:3000/verified?token=' . $verificationToken;
             $frontendUrl = config('constants.BASE_URL') . '/verified?token=' . $verificationToken;
             Mail::html(
                 "Please verify your new email by clicking this link: <a href=\"$frontendUrl\">$frontendUrl</a>",
@@ -403,7 +415,7 @@ class UserController extends Controller
         $user = User::where('email', $request->email)->first();
 
         // $resetUrl = url('/resetForm?email=' . urlencode($user->email));
-        //$frontendUrl = 'http://localhost:3000/reset?email=' . $user->email;
+        // $frontendUrl = 'http://localhost:3000/reset?email=' . $user->email;
         $frontendUrl = config('constants.BASE_URL') . '/reset?email=' . $user->email;
 
         Mail::html(
@@ -494,7 +506,7 @@ class UserController extends Controller
         return response()->json($user);
     }
 
-    //Master Verify in case required to bring back the deleted user
+    // Master Verify in case required to bring back the deleted user
     public function masterVerify(Request $request, $id)
     {
         $user = User::where('id', $id)->first();
@@ -506,21 +518,21 @@ class UserController extends Controller
             return response()->json(['message' => 'User already verified.'], 200);
         }
         $user->deleted_by = null;
+        $user->email_verified_at = Carbon::now();
         $user->save();
+        return response()->json(['message' => 'User verified successfully.']);
 
-        
+        // $frontendUrl = config('constants.BASE_URL') . '/verified?token=' . $user->verification_token;
+        // Mail::html(
+        //     "Please verify your email by clicking this link: <a href=\"$frontendUrl\">$frontendUrl</a>",
+        //     function ($message) use ($user) {
+        //         $message
+        //             ->to($user->email)
+        //             ->subject('Verify Your Email');
+        //     }
+        // );
 
-        $frontendUrl = config('constants.BASE_URL') . '/verified?token=' . $user->verification_token;
-        Mail::html(
-            "Please verify your email by clicking this link: <a href=\"$frontendUrl\">$frontendUrl</a>",
-            function ($message) use ($user) {
-                $message
-                    ->to($user->email)
-                    ->subject('Verify Your Email');
-            }
-        );
-
-        return response()->json(['message' => 'Verification email sent to user.']);
+        // return response()->json(['message' => 'Verification email sent to user.']);
     }
 
     // Exporting the users to a CSV file
