@@ -28,12 +28,18 @@ class TestNotification extends Command
     // Send emails to users with task summaries and reminders
     public function handle()
     {
-        $notification = Notification::create([
-            'assignee' => (string) 1,
+        // $notification = Notification::create([
+        //     'assignee' => (string) 1,
+        //     'status' => 'unread',
+        //     'title' => 'Task Status Changed',
+        //     'description' => 'Your task status has been changed TestTask to pending',
+        // ]);
+        \event(new NotificationCreated(
+            ['assignee' => (string) 1,
             'status' => 'unread',
             'title' => 'Task Status Changed',
-            'description' => 'Your task status has been changed TestTask to pending',
-        ]);
-        event(new NotificationCreated($notification, 1));
+            'description' => 'Your task status has been changed TestTask to pending'],
+            1
+        ));
     }
 }
